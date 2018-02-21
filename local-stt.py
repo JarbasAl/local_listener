@@ -10,19 +10,8 @@ import tempfile
 class LocalListener(object):
     def __init__(self, hmm=None, lm=None, le_dict=None, lang="en-us"):
         self.lang = lang
-        if le_dict is None:
-            le_dict = join(dirname(__file__), lang, 'basic.dic')
-        if hmm is None:
-            hmm = join(dirname(__file__), lang, 'hmm')
-        if lm is None:
-            lm = join(dirname(__file__), lang, 'localstt.lm')
-
-        self.config = Decoder.default_config()
-        self.config.set_string('-hmm', hmm)
-        self.config.set_string('-lm', lm)
-        self.config.set_string('-dict', le_dict)
-        self.config.set_string('-logfn', '/dev/null')
-        self.decoder = Decoder(self.config)
+        self.decoder = None
+        self.reset_decoder(hmm, lm, le_dict, lang)
 
         ERROR_HANDLER_FUNC = CFUNCTYPE(None, c_char_p, c_int, c_char_p, c_int,
                                        c_char_p)
@@ -48,13 +37,29 @@ class LocalListener(object):
                                   input=True, frames_per_buffer=1024)
         self.listening = False
 
+    def reset_decoder(self, hmm=None, lm=None, le_dict=None, lang=None):
+        self.lang = lang or self.lang
+        if le_dict is None:
+            le_dict = join(dirname(__file__), lang, 'basic.dic')
+        if hmm is None:
+            hmm = join(dirname(__file__), lang, 'hmm')
+        if lm is None:
+            lm = join(dirname(__file__), lang, 'localstt.lm')
+
+        self.config = Decoder.default_config()
+        self.config.set_string('-hmm', hmm)
+        self.config.set_string('-lm', lm)
+        self.config.set_string('-dict', le_dict)
+        self.config.set_string('-logfn', '/dev/null')
+        self.decoder = Decoder(self.config)
+
     def listen(self):
         print "starting stream"
         self.stream.start_stream()
 
         in_speech_bf = False
         if self.decoder is None:
-            self.decoder = Decoder(self.config)
+            self.reset_decoder()
 
         self.decoder.start_utt()
         print "listening"
@@ -87,7 +92,7 @@ class LocalListener(object):
 
         in_speech_bf = False
         if self.decoder is None:
-            self.decoder = Decoder(self.config)
+            self.reset_decoder()
 
         self.decoder.start_utt()
         print "listening once"
@@ -157,9 +162,12 @@ class LocalListener(object):
                 break
         self.decoder.end_utt()
 
-    def listen_once_specialized(self, dictionary):
-        config = self.config
-        config.set_string('-dict', self.create_dict(dictionary))
+    def listen_once_specialized(self, dictionary=None, config=None):
+        if config is None:
+            config = self.config
+        if dictionary is not None:
+            config.set_string('-dict', self.create_dict(dictionary))
+            print dictionary.keys()
         self.decoder = Decoder(config)
         print "starting stream"
         print dictionary.keys()
