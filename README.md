@@ -17,11 +17,27 @@ or
 
     from TODO import LocalListener()
 
+    ...
+
+    def handle_my_intent(self, message):
+
+        # it may be good to trigger naptime before using this,
+        self.emitter.emit(Message('recognizer_loop:sleep'))
+
+        ...
+        # do the listening here
+        local = LocalListener()
+        ...
+
+        # and reactivate after
+        self.emitter.emit(Message('recognizer_loop:wake_up'))
+
+
 # listen once
 
 capture one utterance
 
-    local = LocalListener()
+
     print local.listen_once()
 
 # listen continuous
