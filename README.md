@@ -15,7 +15,7 @@ or
 
 # usage
 
-    from TODO import LocalListener()
+    from TODO import LocalListener
 
     ...
 
