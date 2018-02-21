@@ -117,10 +117,13 @@ any language should be supported if you provide the models, english and spanish 
 
 - pip package
 - LOGS not prints
+- naptime skill will answer with “i am awake”, not sure how to best handle this?
+
 
 # Credits
 
 - JarbasAI
+
 - Adapted from [tjoen](https://github.com/tjoen/local-stt-test)
 
 # liked this and want more?
