@@ -28,7 +28,9 @@ class LocalListener(object):
                                        c_char_p)
 
         def py_error_handler(filename, line, function, err, fmt):
-            pass
+            ignores = [0, 2, 16, 77]
+            if err not in ignores:
+                print err, fmt
 
         c_error_handler = ERROR_HANDLER_FUNC(py_error_handler)
 
@@ -226,8 +228,3 @@ class LocalListener(object):
                 for word, phoneme in zip(words, phoneme_groups):
                     f.write(word + ' ' + phoneme + '\n')
         return file_name
-
-
-local = LocalListener()
-for ut in local.listen_numbers():
-    print ut
