@@ -35,7 +35,7 @@ capture one utterance
 
 # listen for numbers only
 
-this will work only in english
+
     local = LocalListener()
     print local.listen_numbers_once()
 
@@ -86,15 +86,14 @@ if no dictionary is provided it will use a very basic one
 # language support
 
 
-english and spanish supported by default
-
-
-any language should be supported if you provide the models,
+any language should be supported if you provide the models, english and spanish supported by default
 
 
     local = LocalListener(lang="es-es")
 
-    local = LocalListener(hmm="path", lm="path2", le_dict="path3", lang="pt-br")
+    local = LocalListener(hmm="path", lm="path2", le_dict="path3")
+
+    print local.listen_numbers_once("path/lang/numbers.dic")
 
 
 # TODOs
