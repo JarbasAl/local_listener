@@ -9,6 +9,7 @@ pocketsphinx local listener with limited vocab for use inside skills in mycroft-
     - git clone repo_url
     - TODO setup.py
 or
+
     pip install TODO
 
 
@@ -103,8 +104,8 @@ any language should be supported if you provide the models, english and spanish 
 
 # Credits
 
-JarbasAI
-Adapted from [tjoen](https://github.com/tjoen/local-stt-test)
+- JarbasAI
+- Adapted from [tjoen](https://github.com/tjoen/local-stt-test)
 
 # liked this and want more?
 
