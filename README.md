@@ -19,18 +19,17 @@ or
 
     ...
 
+    def initialize(self):
+        self.local = LocalListener(lang=self.lang, emitter=self.emitter)
+
     def handle_my_intent(self, message):
+        # do stuff
+        utterance = local.listen_once()
+        # do more stuff
 
-        # it may be good to trigger naptime before using this,
-        self.emitter.emit(Message('recognizer_loop:sleep'))
-
-        ...
-        # do the listening here
-        local = LocalListener()
-        ...
-
-        # and reactivate after
-        self.emitter.emit(Message('recognizer_loop:wake_up'))
+    def shutdown(self):
+        self.local.shutdown()
+        super(MycroftSkill, self).shutdown()
 
 
 # listen once
@@ -41,6 +40,8 @@ capture one utterance
     print local.listen_once()
 
 # listen continuous
+
+capture utterances continuously
 
     local = LocalListener()
     i = 0
@@ -65,6 +66,9 @@ capture one utterance
 
 # listen for specific vocab
 
+provide the words and phonemes explicitly
+
+
     vocab = {"hello": ["HH AH L OW"]}
     local = LocalListener()
     print local.listen_once_specialized(vocab)
@@ -75,6 +79,15 @@ capture one utterance
         i += 1
         if i > 5:
             local.stop_listening()
+
+# listening async
+
+this listening mode will emit captured answers to the messagebus like a normal
+ speak message
+
+     local = LocalListener()
+     local.listen_async()
+     # keep doing things, utterances will be handled normally
 
 
 # available commands
@@ -113,11 +126,22 @@ any language should be supported if you provide the models, english and spanish 
     print local.listen_numbers_once("path/lang/numbers.dic")
 
 
+# Logs
+
+        19:04:00.832 - mycroft.messagebus.service.ws:on_message:41 - DEBUG - {"data": {}, "type": "recognizer_loop:sleep", "context": {"source": "LocalListener"}}
+    19:04:00.835 - mycroft.messagebus.service.ws:on_message:41 - DEBUG - {"data": {}, "type": "recognizer_loop:local_listener.start", "context": {"source": "LocalListener"}}
+    19:04:02.951 - mycroft.messagebus.service.ws:on_message:41 - DEBUG - {"data": {"lang": "en-us", "utterances": ["never mind"]}, "type": "recognizer_loop:utterance", "context": {"source": "LocalListener"}}
+    19:04:05.337 - mycroft.messagebus.service.ws:on_message:41 - DEBUG - {"data": {"lang": "en-us", "utterances": ["pauze"]}, "type": "recognizer_loop:utterance", "context": {"source": "LocalListener"}}
+    19:04:06.773 - mycroft.messagebus.service.ws:on_message:41 - DEBUG - {"data": {"lang": "en-us", "utterances": ["stop"]}, "type": "recognizer_loop:utterance", "context": {"source": "LocalListener"}}
+    19:04:08.775 - mycroft.messagebus.service.ws:on_message:41 - DEBUG - {"data": {"lang": "en-us", "utterances": ["never mind"]}, "type": "recognizer_loop:utterance", "context": {"source": "LocalListener"}}
+    19:04:10.343 - mycroft.messagebus.service.ws:on_message:41 - DEBUG - {"data": {"lang": "en-us", "utterances": ["pauze"]}, "type": "recognizer_loop:utterance", "context": {"source": "LocalListener"}}
+    19:04:10.845 - mycroft.messagebus.service.ws:on_message:41 - DEBUG - {"data": {}, "type": "recognizer_loop:local_listener.end", "context": {"source": "LocalListener"}}
+    19:04:10.849 - mycroft.messagebus.service.ws:on_message:41 - DEBUG - {"data": {}, "type": "recognizer_loop:wake_up", "context": {"source": "LocalListener"}}
+
 # TODOs
 
 - pip package
-- LOGS not prints
-- naptime skill will answer with “i am awake”, not sure how to best handle this?
+- naptime skill will answer with “i am awake”, [PR#9](https://github.com/MycroftAI/skill-naptime/pull/9)
 
 
 # Credits
