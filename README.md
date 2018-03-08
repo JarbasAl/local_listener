@@ -15,7 +15,7 @@ or
 
 # usage
 
-    from TODO import LocalListener
+    from localstt import LocalListener
 
     ...
 
@@ -38,7 +38,8 @@ capture one utterance
 
     print local.listen()
 
-# listen continuous
+# listen continuous 
+- Set listenonce to False
 
 capture utterances continuously
 
