@@ -68,7 +68,7 @@ class LocalListener(object):
             self.emitter.emit(Message(message, data, context))
 
     def reset_decoder(self, hmm=None, lm=None, le_dict=None):
-        LOG.info("reseting decoder")
+        LOG.info("resetting decoder")
         lang = self.lang
         le_dict = le_dict or join(dirname(__file__), lang, 'basic.dic')
         hmm = hmm or join(dirname(__file__), lang, 'hmm')
@@ -315,6 +315,8 @@ class LocalListener(object):
             self.async_thread = None
         LOG.info("stopping local recognition")
         self.stop_listening()
+        self.stream.stop_stream()
+        self.stream.close()
         self.decoder = None
         self.stream = None
         if self.p:
@@ -357,7 +359,7 @@ if __name__ == "__main__":
 
     try:
         local = LocalListener()
-        print "liste forever"
+        print "listen forever"
         for ut in local.listen():
             print ut
         local.shutdown()
