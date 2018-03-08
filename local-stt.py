@@ -9,7 +9,14 @@ from threading import Thread
 from mycroft.messagebus.message import Message
 from mycroft.messagebus.client.ws import WebsocketClient
 from mycroft.util.log import LOG
+from mycroft.configuration import ConfigurationManager
+from mycroft.util import resolve_resource_file, play_wav
 from time import sleep
+
+
+# load wav config
+config = ConfigurationManager.get()
+
 
 
 class LocalListener(object):
@@ -17,8 +24,10 @@ class LocalListener(object):
                  emitter=None, debug=False):
         self.lang = lang
         self.decoder = None
-        self.config = Decoder.default_config()
-        self.reset_decoder(hmm, lm, le_dict)
+        self.listening = False
+        self.emitter = emitter
+        self.event_thread = None
+        self.async_thread = None
 
         if not debug:
             ERROR_HANDLER_FUNC = CFUNCTYPE(None, c_char_p, c_int, c_char_p, c_int,
@@ -45,10 +54,7 @@ class LocalListener(object):
         self.stream = self.p.open(format=pyaudio.paInt16, channels=1,
                                   rate=16000,
                                   input=True, frames_per_buffer=1024)
-        self.listening = False
-        self.emitter = emitter
-        self.event_thread = None
-        self.async_thread = None
+
         if self.emitter is None:
             self.emitter = WebsocketClient()
 
@@ -61,56 +67,45 @@ class LocalListener(object):
             self.event_thread.start()
             sleep(2)
 
+
     def emit(self, message, data=None, context=None):
         if self.emitter is not None:
             data = data or {}
             context = context or {"source": "LocalListener"}
             self.emitter.emit(Message(message, data, context))
 
-    def reset_decoder(self, hmm=None, lm=None, le_dict=None):
-        LOG.info("resetting decoder")
-        lang = self.lang
-        le_dict = le_dict or join(dirname(__file__), lang, 'basic.dic')
-        hmm = hmm or join(dirname(__file__), lang, 'hmm')
-        lm = lm or join(dirname(__file__), lang, 'localstt.lm')
-        self.config = Decoder.default_config()
-        self.config.set_string('-hmm', hmm)
-        self.config.set_string('-lm', lm)
-        self.config.set_string('-dict', le_dict)
-        self.config.set_string('-logfn', '/dev/null')
-        self.decoder = Decoder(self.config)
 
-    def listen(self):
+    def handle_record_begin(self):
+        # If enabled, play a wave file with a short sound to audibly
+        # indicate recording has begun.
+        if config.get('confirm_listening'):
+            file = resolve_resource_file(
+                config.get('sounds').get('start_listening'))
+            if file:
+                play_wav(file)
         LOG.info("deactivating speech recognition")
         self.emit("recognizer_loop:sleep")
         self.emit("recognizer_loop:local_listener.start")
+        self.emit('recognizer_loop:record_begin')
 
-        self.stream.start_stream()
 
-        in_speech_bf = False
+    def handle_record_end(self):
+        print("End Recording...")
+        self.emit('recognizer_loop:record_end')
+        LOG.info("reactivating speech recognition")
+        self.emit("recognizer_loop:local_listener.end")
+        self.emit("recognizer_loop:wake_up")
 
-        self.decoder.start_utt()
-        self.listening = True
-        LOG.info("continuous listening")
-        while self.listening:
-            buf = self.stream.read(1024)
-            if buf:
-                if self.decoder is None:
-                    self.reset_decoder()
-                    self.decoder.start_utt()
-                self.decoder.process_raw(buf, False, False)
-                if self.decoder.get_in_speech() != in_speech_bf:
-                    in_speech_bf = self.decoder.get_in_speech()
-                    if not in_speech_bf:
-                        self.decoder.end_utt()
-                        hypoteses = self.decoder.hyp()
-                        if hypoteses is None:
-                            self.decoder.start_utt()
-                            continue
-                        utt = self.decoder.hyp().hypstr
-                        if utt.strip() != '':
-                            self.decoder.start_utt()
-                            yield utt.strip()
+
+    def resetdecoder(self):
+        # decoder config
+        self.config = Decoder.default_config()
+        self.config.set_string('-hmm', '/usr/local/lib/python2.7/site-packages/mycroft_core-18.2.0-py2.7.egg/mycroft/client/speech/recognizer/model/en-us/hmm')
+        self.config.set_string('-lm', '/home/pi/local_listener/9794.lm')
+        self.config.set_string('-dict', '/home/pi/local_listener/9794.dic')
+        self.config.set_string('-logfn', '/dev/null')
+        self.decoder = Decoder( self.config )
+
 
     def listen_async(self):
         LOG.info("starting async local listening")
@@ -118,160 +113,45 @@ class LocalListener(object):
         self.async_thread.setDaemon(True)
         self.async_thread.start()
 
+
     def _async_listen(self):
-        for ut in self.listen():
-            print "emitting to bus:", ut
+        for ut in self.listen( listenonce=False ):
             if ut is not None:
+                print "emitting to bus:", ut
                 self.emit("recognizer_loop:utterance",
                                   {"utterances": [ut.lower()], "lang":
                                       self.lang})
 
-    def listen_once(self):
+
+    def listen(self, listenonce=True ):
+        self.resetdecoder()
+        self.handle_record_begin()
         self.stream.start_stream()
-
-        in_speech_bf = False
-        if self.decoder is None:
-            self.reset_decoder()
-
-        self.decoder.start_utt()
         self.listening = True
-        LOG.info("deactivating speech recognition")
-        self.emit("recognizer_loop:sleep")
-        self.emit("recognizer_loop:local_listener.start")
-        LOG.info("listening once")
+        in_speech_bf = False
+        self.decoder.start_utt()
         while self.listening:
             buf = self.stream.read(1024)
             if buf:
-                if self.decoder is None:
-                    self.reset_decoder()
-                    self.decoder.start_utt()
                 self.decoder.process_raw(buf, False, False)
                 if self.decoder.get_in_speech() != in_speech_bf:
                     in_speech_bf = self.decoder.get_in_speech()
                     if not in_speech_bf:
                         self.decoder.end_utt()
-                        hypoteses = self.decoder.hyp()
-                        if hypoteses is None:
-                            self.decoder.start_utt()
-                            continue
                         utt = self.decoder.hyp().hypstr
+                        self.decoder.start_utt()
                         if utt.strip() != '':
-                            self.stop_listening()
-                            return utt.strip()
-
+                            reply = utt.strip()
+                            if listenonce:
+                                self.listening = False
+                                yield reply
+                            else:
+                                yield reply
             else:
                 break
         self.decoder.end_utt()
-        return None
+        self.shutdown()   
 
-    def listen_numbers(self, configpath=None):
-        LOG.info("listening for numbers")
-        for number in self.listen_specialized(config=self.numbers_config(
-                configpath)):
-            yield number
-
-    def listen_numbers_once(self, configpath=None):
-        LOG.info("listening for numbers once")
-        return self.listen_once_specialized(config=self.numbers_config(configpath))
-
-    def listen_specialized(self, dictionary=None, config=None):
-
-        if config is None:
-            config = self.config
-        else:
-            LOG.info("loading custom decoder config")
-        if dictionary is not None:
-            LOG.info("loading custom dictionary")
-            config.set_string('-dict', self.create_dict(dictionary))
-            print dictionary.keys()
-        self.decoder = Decoder(config)
-        self.stream.start_stream()
-
-        in_speech_bf = False
-        self.decoder.start_utt()
-        LOG.info("deactivating speech recognition")
-        self.emit("recognizer_loop:sleep")
-        self.emit("recognizer_loop:local_listener.start")
-        self.listening = True
-        LOG.info("continuous listening")
-        while self.listening:
-            buf = self.stream.read(1024)
-            if buf:
-                if self.decoder is None:
-                    self.decoder = Decoder(config)
-                    self.decoder.start_utt()
-                self.decoder.process_raw(buf, False, False)
-                if self.decoder.get_in_speech() != in_speech_bf:
-                    in_speech_bf = self.decoder.get_in_speech()
-                    if not in_speech_bf:
-                        self.decoder.end_utt()
-                        hypoteses = self.decoder.hyp()
-                        if hypoteses is None:
-                            self.decoder.start_utt()
-                            continue
-                        utt = self.decoder.hyp().hypstr
-                        if utt.strip() != '':
-                            self.decoder.start_utt()
-                            yield utt.strip()
-
-            else:
-                break
-        self.decoder.end_utt()
-
-    def listen_once_specialized(self, dictionary=None, config=None):
-        if config is None:
-            config = self.config
-        else:
-            LOG.info("loading custom decoder config")
-        if dictionary is not None:
-            LOG.info("loading custom dictionary")
-            config.set_string('-dict', self.create_dict(dictionary))
-            print dictionary.keys()
-        self.decoder = Decoder(config)
-
-        self.stream.start_stream()
-
-        in_speech_bf = False
-        self.decoder.start_utt()
-        self.listening = True
-        LOG.info("deactivating speech recognition")
-        self.emit("recognizer_loop:sleep")
-        self.emit("recognizer_loop:local_listener.start")
-        LOG.info("listening once")
-        while self.listening:
-            buf = self.stream.read(1024)
-            if buf:
-                if self.decoder is None:
-                    self.decoder = Decoder(config)
-                    self.decoder.start_utt()
-                self.decoder.process_raw(buf, False, False)
-                if self.decoder.get_in_speech() != in_speech_bf:
-                    in_speech_bf = self.decoder.get_in_speech()
-                    if not in_speech_bf:
-                        self.decoder.end_utt()
-                        hypoteses = self.decoder.hyp()
-                        if hypoteses is None:
-                            self.decoder.start_utt()
-                            continue
-                        utt = self.decoder.hyp().hypstr
-                        if utt.strip() != '':
-                            self.stop_listening()
-                            return utt.strip()
-
-            else:
-                break
-        self.decoder.end_utt()
-        self.stop_listening()
-
-    def stop_listening(self):
-        if self.listening:
-            LOG.info("reactivating speech recognition")
-            self.emit("recognizer_loop:local_listener.end")
-            self.emit("recognizer_loop:wake_up")
-            self.listening = False
-            self.reset_decoder()
-            return True
-        return False
 
     def numbers_config(self, numbers):
         numbers = numbers or join(dirname(__file__), self.lang,
@@ -293,6 +173,7 @@ class LocalListener(object):
         config.set_string('-dict', numbers)
         return config
 
+
     def create_dict(self, phonemes_dict):
         (fd, file_name) = tempfile.mkstemp()
         with fdopen(fd, 'w') as f:
@@ -304,6 +185,7 @@ class LocalListener(object):
                     f.write(word + ' ' + phoneme + '\n')
         return file_name
 
+
     def shutdown(self):
         if self.event_thread:
             LOG.info("disconnecting from bus")
@@ -314,7 +196,7 @@ class LocalListener(object):
             self.async_thread.join(timeout=1)
             self.async_thread = None
         LOG.info("stopping local recognition")
-        self.stop_listening()
+        self.handle_record_end()
         self.stream.stop_stream()
         self.stream.close()
         self.decoder = None
@@ -322,47 +204,35 @@ class LocalListener(object):
         if self.p:
             self.p.terminate()
 
+
+
 if __name__ == "__main__":
     try:
         local = LocalListener()
         print "listen once"
-        print local.listen_once()
-        local.shutdown()
+        ut =  local.listen()
+        for i in ut:
+            print(i)
     except Exception as e:
         print e
 
 
     try:
         local = LocalListener()
-        print "listen async"
+        print "listen continious till quit keyword"
+        ut =  local.listen( False )
+        for i in ut:
+            print(i)
+            if i == "QUIT":
+                local.listening = False
+    except Exception as e:
+        print e
+
+    try:
+        local = LocalListener()
+        print "listen async continious till quit keyword"
         local.listen_async()
-        sleep(10)
-        local.stop_listening()
-        local.shutdown()
+        while True:
+            sleep(1)
     except Exception as e:
         print e
-
-
-    try:
-        local = LocalListener()
-        i = 0
-        print "listen numbers"
-        for number in local.listen_numbers():
-            print number
-            i += 1
-            if i > 10:
-                break
-        local.shutdown()
-    except Exception as e:
-        print e
-
-
-    try:
-        local = LocalListener()
-        print "listen forever"
-        for ut in local.listen():
-            print ut
-        local.shutdown()
-    except Exception as e:
-        print e
-
