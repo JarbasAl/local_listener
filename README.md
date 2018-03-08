@@ -24,7 +24,7 @@ or
 
     def handle_my_intent(self, message):
         # do stuff
-        utterance = local.listen_once()
+        utterance = local.listen()
         # do more stuff
 
     def shutdown(self):
@@ -36,8 +36,7 @@ or
 
 capture one utterance
 
-
-    print local.listen_once()
+    print local.listen()
 
 # listen continuous
 
@@ -45,13 +44,13 @@ capture utterances continuously
 
     local = LocalListener()
     i = 0
-    for utterance in local.listen():
+    for utterance in local.listen( False ):
         print utterance
         i += 1
         if i > 5:
-            local.stop_listening()
+            local.listening = False
 
-# listen for numbers only
+# listen for numbers only / TODO
 
 
     local = LocalListener()
@@ -64,7 +63,7 @@ capture utterances continuously
         if i > 5:
             local.stop_listening()
 
-# listen for specific vocab
+# listen for specific vocab / TODO
 
 provide the words and phonemes explicitly
 
@@ -80,7 +79,7 @@ provide the words and phonemes explicitly
         if i > 5:
             local.stop_listening()
 
-# listening async
+# listening async - sends ut to BUS
 
 this listening mode will emit captured answers to the messagebus like a normal
  speak message
