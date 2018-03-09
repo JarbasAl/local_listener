@@ -36,29 +36,30 @@ or
 
 capture one utterance
 
-    print local.listen()
+    print local.listen_once()
 
 # listen continuous 
-- Set listenonce to False
 
 capture utterances continuously
 
     local = LocalListener()
     i = 0
-    for utterance in local.listen( False ):
+    for utterance in local.listen():
         print utterance
         i += 1
         if i > 5:
             local.listening = False
 
 # listen for numbers only
-
+    
+listen once
 
     local = LocalListener()
-    for utterance in local.listen_numbers_once()
-        print utterance
-        
-         
+    print local.listen_numbers_once()
+    
+listen continuous
+    
+    local = LocalListener()      
     i = 0
     for utterance in local.listen_numbers():
         print utterance
