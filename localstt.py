@@ -1,4 +1,4 @@
-﻿from ctypes import *
+from ctypes import *
 from contextlib import contextmanager
 from os import fdopen
 from os.path import exists, dirname, join
@@ -213,8 +213,8 @@ class LocalListener(object):
         if self.async_thread:
             LOG.info('stopping async thread')
             self.async_thread.join(timeout=1)
+            self.listening=False 
             self.async_thread = None
-            self.shutdown() 
             return True
         return False
 
@@ -327,6 +327,7 @@ if __name__ == "__main__":
         while True:
             sleep(10)
             local.stop_listening()
+            break
             
     except Exception as e:
         print e
