@@ -1,4 +1,4 @@
-from ctypes import *
+﻿from ctypes import *
 from contextlib import contextmanager
 from os import fdopen
 from os.path import exists, dirname, join
@@ -12,10 +12,7 @@ from mycroft.util.log import LOG
 from mycroft.configuration import ConfigurationManager
 from mycroft.util import resolve_resource_file, play_wav
 from time import sleep
-
-
-# load wav config
-config = ConfigurationManager.get()
+from subprocess import check_output
 
 
 
@@ -28,6 +25,13 @@ class LocalListener(object):
         self.emitter = emitter
         self.event_thread = None
         self.async_thread = None
+        # get hmm, already in mycroft
+        cmd = 'pip show mycroft_core | grep Location'
+        reply = check_output(cmd, shell=True)
+        self.hmm = reply .split()[1]+'/mycroft/client/speech/recognizer/model/en-us/hmm/'
+        # load wav config
+        self.audioconfig = ConfigurationManager.get()
+        self.reset_decoder()
 
         if not debug:
             ERROR_HANDLER_FUNC = CFUNCTYPE(None, c_char_p, c_int, c_char_p, c_int,
@@ -78,9 +82,9 @@ class LocalListener(object):
     def handle_record_begin(self):
         # If enabled, play a wave file with a short sound to audibly
         # indicate recording has begun.
-        if config.get('confirm_listening'):
+        if self.audioconfig.get('confirm_listening'):
             file = resolve_resource_file(
-                config.get('sounds').get('start_listening'))
+                self.audioconfig.get('sounds').get('start_listening'))
             if file:
                 play_wav(file)
         LOG.info("deactivating speech recognition")
@@ -97,15 +101,21 @@ class LocalListener(object):
         self.emit("recognizer_loop:wake_up")
 
 
-    def resetdecoder(self):
-        # decoder config
+    def reset_decoder(self, hmm=None, lm=None, le_dict=None):
+        LOG.info("resetting decoder")
+        lang = self.lang
+        le_dict = le_dict or join(dirname(__file__), lang, '9794.dic')
+        if self.lang == 'en-us':
+            hmm = self.hmm
+        else: 
+            hmm = hmm or join(dirname(__file__), lang, 'hmm')
+        lm = lm or join(dirname(__file__), lang, '9794.lm')
         self.config = Decoder.default_config()
-        self.config.set_string('-hmm', '/usr/local/lib/python2.7/site-packages/mycroft_core-18.2.0-py2.7.egg/mycroft/client/speech/recognizer/model/en-us/hmm')
-        self.config.set_string('-lm', '/home/pi/local_listener/9794.lm')
-        self.config.set_string('-dict', '/home/pi/local_listener/9794.dic')
+        self.config.set_string('-hmm', hmm)
+        self.config.set_string('-lm', lm)
+        self.config.set_string('-dict', le_dict)
         self.config.set_string('-logfn', '/dev/null')
-        self.decoder = Decoder( self.config )
-
+        self.decoder = Decoder(self.config)
 
     def listen_async(self):
         LOG.info("starting async local listening")
@@ -118,13 +128,10 @@ class LocalListener(object):
         for ut in self.listen( listenonce=False ):
             if ut is not None:
                 print "emitting to bus:", ut
-                self.emit("recognizer_loop:utterance",
-                                  {"utterances": [ut.lower()], "lang":
-                                      self.lang})
-
+                self.emit("recognizer_loop:utterance", {"utterances": [ut.lower()], "lang": self.lang})
 
     def listen(self, listenonce=True ):
-        self.resetdecoder()
+        self.reset_decoder()
         self.handle_record_begin()
         self.stream.start_stream()
         self.listening = True
@@ -149,11 +156,71 @@ class LocalListener(object):
                                 yield reply
             else:
                 break
-        self.decoder.end_utt()
+        self.shutdown()
+
+
+    def listen_numbers(self, configpath=None):
+        LOG.info("listening for numbers")
+        for number in self.listen_specialized( config=self.numbers_config(
+                configpath)):
+            yield number
+
+    def listen_numbers_once(self, configpath=None):
+        LOG.info("listening for numbers once")
+        return self.listen_specialized(config=self.numbers_config(configpath), listenonce=True)
+
+
+    def listen_specialized(self, dictionary=None, config=None, listenonce=False):
+        self.reset_decoder()
+        if config is None:
+            config = self.config
+        else:
+            LOG.info("loading custom decoder config")
+        if dictionary is not None:
+            LOG.info("loading custom dictionary")
+            config.set_string('-dict', self.create_dict(dictionary))
+            print dictionary.keys()
+        self.decoder = Decoder(config)
+        self.handle_record_begin()
+        self.stream.start_stream()
+        self.listening = True
+        in_speech_bf = False
+        self.decoder.start_utt()
+        LOG.info("continuous listening")
+        while self.listening:
+            buf = self.stream.read(1024)
+            if buf:
+                self.decoder.process_raw(buf, False, False)
+                if self.decoder.get_in_speech() != in_speech_bf:
+                    in_speech_bf = self.decoder.get_in_speech()
+                    if not in_speech_bf:
+                        self.decoder.end_utt()
+                        utt = self.decoder.hyp().hypstr
+                        self.decoder.start_utt()
+                        if utt.strip() != '':
+                            reply = utt.strip()
+                            if listenonce:
+                                self.listening = False
+                                yield reply
+                            else:
+                                yield reply
+            else:
+                break
         self.shutdown()   
 
 
+    def stop_listening(self):
+        if self.async_thread:
+            LOG.info('stopping async thread')
+            self.async_thread.join(timeout=1)
+            self.async_thread = None
+            self.shutdown() 
+            return True
+        return False
+
+
     def numbers_config(self, numbers):
+        print ('running number config')
         numbers = numbers or join(dirname(__file__), self.lang,
                                        'numbers.dic')
 
@@ -187,18 +254,19 @@ class LocalListener(object):
 
 
     def shutdown(self):
-        if self.event_thread:
-            LOG.info("disconnecting from bus")
-            self.event_thread.join(timeout=1)
-            self.event_thread = None
-        if self.async_thread:
-            LOG.info("stopping async thread")
-            self.async_thread.join(timeout=1)
-            self.async_thread = None
-        LOG.info("stopping local recognition")
+        self.decoder.end_utt()
         self.handle_record_end()
         self.stream.stop_stream()
         self.stream.close()
+        if self.event_thread:
+            LOG.info('disconnecting from bus')
+            self.event_thread.join(timeout=1)
+            self.event_thread = None
+        if self.async_thread:
+            LOG.info('stopping async thread')
+            self.async_thread.join(timeout=1)
+            self.async_thread = None
+        LOG.info('stopping local recognition')
         self.decoder = None
         self.stream = None
         if self.p:
@@ -219,7 +287,7 @@ if __name__ == "__main__":
 
     try:
         local = LocalListener()
-        print "listen continious till quit keyword"
+        print "listen continuous until QUIT keyword"
         ut =  local.listen( False )
         for i in ut:
             print(i)
@@ -228,11 +296,37 @@ if __name__ == "__main__":
     except Exception as e:
         print e
 
+
     try:
         local = LocalListener()
-        print "listen async continious till quit keyword"
+        print "listen for numbers / ONLY 1, 2, 3 exist in le file! so use these! "
+        i = 0
+        for utt in local.listen_numbers():
+            print utt
+            i += 1
+            if i == 3:
+                local.listening = False
+
+    except Exception as e:
+        print e
+
+    try:
+        local = LocalListener()
+        print "listen for numbers once / ONLY 1, 2, 3 exist in le file! so use these! "
+        for utt in local.listen_numbers_once():
+            print utt
+
+    except Exception as e:
+        print e
+
+
+    try:
+        local = LocalListener()
+        print "listen async continuous for 10 seconds"
         local.listen_async()
         while True:
-            sleep(1)
+            sleep(10)
+            local.stop_listening()
+            
     except Exception as e:
         print e
