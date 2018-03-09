@@ -51,20 +51,22 @@ capture utterances continuously
         if i > 5:
             local.listening = False
 
-# listen for numbers only / TODO
+# listen for numbers only
 
 
     local = LocalListener()
-    print local.listen_numbers_once()
-
+    for utterance in local.listen_numbers_once()
+        print utterance
+        
+         
     i = 0
     for utterance in local.listen_numbers():
         print utterance
         i += 1
-        if i > 5:
-            local.stop_listening()
+        if i == 5:
+            local.listening = False
 
-# listen for specific vocab / TODO
+# listen for specific vocab 
 
 provide the words and phonemes explicitly
 
@@ -80,7 +82,7 @@ provide the words and phonemes explicitly
         if i > 5:
             local.stop_listening()
 
-# listening async - sends ut to BUS
+# listening async 
 
 this listening mode will emit captured answers to the messagebus like a normal
  speak message
@@ -88,6 +90,10 @@ this listening mode will emit captured answers to the messagebus like a normal
      local = LocalListener()
      local.listen_async()
      # keep doing things, utterances will be handled normally
+ 
+ to stop the listening thread:
+ 
+     local.stop_listening()    
 
 
 # available commands
