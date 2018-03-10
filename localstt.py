@@ -1,4 +1,4 @@
-from ctypes import *
+﻿from ctypes import *
 from contextlib import contextmanager
 from os import fdopen
 from os.path import exists, dirname, join
@@ -12,8 +12,7 @@ from mycroft.util.log import LOG
 from mycroft.configuration import ConfigurationManager
 from mycroft.util import resolve_resource_file, play_wav
 from time import sleep
-from subprocess import check_output
-
+from mycroft import MYCROFT_ROOT_PATH
 
 
 class LocalListener(object):
@@ -26,9 +25,7 @@ class LocalListener(object):
         self.event_thread = None
         self.async_thread = None
         # get hmm, already in mycroft
-        cmd = 'pip show mycroft_core | grep Location'
-        reply = check_output(cmd, shell=True)
-        self.hmm = reply .split()[1]+'/mycroft/client/speech/recognizer/model/en-us/hmm/'
+        self.hmm = MYCROFT_ROOT_PATH+'/mycroft/client/speech/recognizer/model/en-us/hmm/'
         # load wav config
         self.audioconfig = ConfigurationManager.get()
         self.reset_decoder()
@@ -102,6 +99,7 @@ class LocalListener(object):
 
 
     def reset_decoder(self, hmm=None, lm=None, le_dict=None):
+        self.lastutt=None
         LOG.info("resetting decoder")
         lang = self.lang
         le_dict = le_dict or join(dirname(__file__), lang, '9794.dic')
@@ -119,9 +117,9 @@ class LocalListener(object):
 
     def listen_once_async(self):
         LOG.info("starting async local listening")
-        self.async_thread = Thread(target=self._async_listen_once)
-        self.async_thread.setDaemon(True)
-        self.async_thread.start()
+        self.async_thread_ = Thread(target=self._async_listen_once)
+        self.async_thread_.setDaemon(True)
+        self.async_thread_.start()
 
     def listen_async(self):
         LOG.info("starting async local listening")
@@ -136,13 +134,11 @@ class LocalListener(object):
                 print "emitting to bus:", ut
                 self.emit("recognizer_loop:utterance", {"utterances": [ut.lower()], "lang": self.lang})
 
-
     def _async_listen_once(self):
-        ut = self.listen_once( )
+        ut = self.listen_once()
         if ut is not None:
             print "emitting to bus:", ut
             self.emit("recognizer_loop:utterance", {"utterances": [ut.lower()], "lang": self.lang})
-
 
     def listen(self ):
         self.reset_decoder()
@@ -164,13 +160,19 @@ class LocalListener(object):
                         self.decoder.start_utt()
                         if utt.strip() != '':
                             reply = utt.strip()
+                            self.lastutt = reply
                             yield reply
             else:
                 break
         self.shutdown()
 
 
-    def listen_once(self ):
+    def listen_once(self):
+        ut = self._listen_once()
+        return ''.join(ut)
+
+
+    def _listen_once(self ):
         self.reset_decoder()
         self.handle_record_begin()
         self.stream.start_stream()
@@ -190,8 +192,9 @@ class LocalListener(object):
                         self.decoder.start_utt()
                         if utt.strip() != '':
                             reply = utt.strip()
+                            yield reply
+                            self.lastutt = reply
                             self.listening = False
-                            return reply
             else:
                 break
         self.shutdown()
@@ -237,13 +240,17 @@ class LocalListener(object):
                         self.decoder.start_utt()
                         if utt.strip() != '':
                             reply = utt.strip()
+                            self.lastutt = reply
                             yield reply
             else:
                 break
         self.shutdown()   
 
-
     def listen_once_specialized(self, dictionary=None, config=None):
+        ut = self._listen_once_specialized(dictionary, config)
+        return ''.join(ut)
+                       
+    def _listen_once_specialized(self, dictionary=None, config=None):
         self.reset_decoder()
         if config is None:
             config = self.config
@@ -272,7 +279,10 @@ class LocalListener(object):
                         self.decoder.start_utt()
                         if utt.strip() != '':
                             reply = utt.strip()
-                            return reply
+                            yield reply
+                            self.lastutt = reply
+                            self.listening = False
+                            
             else:
                 break
         self.shutdown() 
@@ -334,6 +344,7 @@ class LocalListener(object):
         if self.async_thread:
             LOG.info('stopping async thread')
             self.async_thread.join(timeout=1)
+            self.listening=False 
             self.async_thread = None
         LOG.info('stopping local recognition')
         self.decoder = None
@@ -346,11 +357,36 @@ class LocalListener(object):
 if __name__ == "__main__":
 
 
+
     try:
         local = LocalListener()
         print "listen async once"
         local.listen_once_async()
-            
+        while True:
+            sleep(1)       
+            if local.lastutt:
+                print local.lastutt
+                break           
+
+
+    except Exception as e:
+        print e
+
+
+    try:
+        local = LocalListener()
+        print "listen once"
+        print local.listen_once()
+
+    except Exception as e:
+        print e
+
+
+    try:
+        local = LocalListener()
+        print "listen for numbers once / ONLY 1, 2, 3 exist in le file! so use these! "
+        print local.listen_numbers_once()
+
     except Exception as e:
         print e
 
@@ -364,16 +400,6 @@ if __name__ == "__main__":
             local.stop_listening()
             break
             
-    except Exception as e:
-        print e
-
-
-
-    try:
-        local = LocalListener()
-        print "listen once"
-        print local.listen_once()
-
     except Exception as e:
         print e
 
@@ -402,12 +428,3 @@ if __name__ == "__main__":
 
     except Exception as e:
         print e
-
-    try:
-        local = LocalListener()
-        print "listen for numbers once / ONLY 1, 2, 3 exist in le file! so use these! "
-        print local.listen_numbers_once()
-
-    except Exception as e:
-        print e
-
