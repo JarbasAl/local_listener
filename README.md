@@ -15,7 +15,7 @@ or
 
 # usage
 
-    from TODO import LocalListener
+    from localstt import LocalListener
 
     ...
 
@@ -24,7 +24,7 @@ or
 
     def handle_my_intent(self, message):
         # do stuff
-        utterance = local.listen_once()
+        utterance = local.listen()
         # do more stuff
 
     def shutdown(self):
@@ -36,10 +36,9 @@ or
 
 capture one utterance
 
-
     print local.listen_once()
 
-# listen continuous
+# listen continuous 
 
 capture utterances continuously
 
@@ -49,22 +48,26 @@ capture utterances continuously
         print utterance
         i += 1
         if i > 5:
-            local.stop_listening()
+            local.listening = False
 
 # listen for numbers only
-
+    
+listen once
 
     local = LocalListener()
     print local.listen_numbers_once()
-
+    
+listen continuous
+    
+    local = LocalListener()      
     i = 0
     for utterance in local.listen_numbers():
         print utterance
         i += 1
-        if i > 5:
-            local.stop_listening()
+        if i == 5:
+            local.listening = False
 
-# listen for specific vocab
+# listen for specific vocab 
 
 provide the words and phonemes explicitly
 
@@ -80,7 +83,7 @@ provide the words and phonemes explicitly
         if i > 5:
             local.stop_listening()
 
-# listening async
+# listening async 
 
 this listening mode will emit captured answers to the messagebus like a normal
  speak message
@@ -88,6 +91,10 @@ this listening mode will emit captured answers to the messagebus like a normal
      local = LocalListener()
      local.listen_async()
      # keep doing things, utterances will be handled normally
+ 
+ to stop the listening thread:
+ 
+     local.stop_listening()    
 
 
 # available commands
