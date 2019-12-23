@@ -10,6 +10,7 @@ from jarbas_utils.messagebus import Message, get_mycroft_bus
 from jarbas_utils.log import LOG
 from jarbas_utils.configuration import read_mycroft_config
 from jarbas_utils.sound import play_wav
+from jarbas_utils.lang.phonemes import get_phonemes
 from jarbas_utils import resolve_resource_file
 
 
@@ -188,12 +189,19 @@ class LocalListener:
         LOG.info("listening for numbers once")
         return self.listen_once_specialized(config=self.get_numbers_config(configpath))
 
-    def listen_specialized(self, vocab_dict=None, config=None):
+    def listen_specialized(self, word_list=None, vocab_dict=None, config=None):
         self.reset_decoder()
         if config is None:
             config = self.config
         else:
             LOG.info("loading custom decoder config")
+        if word_list:
+            vocab_dict = vocab_dict or {}
+            for word in word_list:
+                if word not in vocab_dict.keys():
+                    # TODO lang support
+                    pho = get_phonemes(word)
+                    vocab_dict[word] = pho
         if vocab_dict is not None:
             LOG.info("loading custom dictionary")
             config.set_string('-dict', self.create_dict(vocab_dict))
