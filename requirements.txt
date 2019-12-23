@@ -1,0 +1,3 @@
+pocketsphinx
+jarbas_utils
+pyaudio
