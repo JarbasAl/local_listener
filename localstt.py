@@ -7,7 +7,7 @@ from pocketsphinx.pocketsphinx import *
 import tempfile
 from threading import Thread
 from mycroft.messagebus.message import Message
-from mycroft.messagebus.client.ws import WebsocketClient
+from mycroft.messagebus.client.client import MessageBusClient
 from mycroft.util.log import LOG
 from mycroft.configuration import ConfigurationManager
 from mycroft.util import resolve_resource_file, play_wav
@@ -37,7 +37,7 @@ class LocalListener(object):
             def py_error_handler(filename, line, function, err, fmt):
                 ignores = [0, 2, 16, 77]
                 if err not in ignores:
-                    print err, fmt
+                    print(err, fmt)
 
             c_error_handler = ERROR_HANDLER_FUNC(py_error_handler)
 
@@ -57,7 +57,7 @@ class LocalListener(object):
                                   input=True, frames_per_buffer=1024)
 
         if self.emitter is None:
-            self.emitter = WebsocketClient()
+            self.emitter = MessageBusClient()
 
             def connect():
                 # Once the websocket has connected, just watch it for events
@@ -131,13 +131,13 @@ class LocalListener(object):
     def _async_listen(self):
         for ut in self.listen( ):
             if ut is not None:
-                print "emitting to bus:", ut
+                print("emitting to bus:", ut)
                 self.emit("recognizer_loop:utterance", {"utterances": [ut.lower()], "lang": self.lang})
 
     def _async_listen_once(self):
         ut = self.listen_once()
         if ut is not None:
-            print "emitting to bus:", ut
+            print("emitting to bus:", ut)
             self.emit("recognizer_loop:utterance", {"utterances": [ut.lower()], "lang": self.lang})
 
     def listen(self ):
@@ -220,7 +220,7 @@ class LocalListener(object):
         if dictionary is not None:
             LOG.info("loading custom dictionary")
             config.set_string('-dict', self.create_dict(dictionary))
-            print dictionary.keys()
+            print(dictionary.keys())
         self.decoder = Decoder(config)
         self.handle_record_begin()
         self.stream.start_stream()
@@ -259,7 +259,7 @@ class LocalListener(object):
         if dictionary is not None:
             LOG.info("loading custom dictionary")
             config.set_string('-dict', self.create_dict(dictionary))
-            print dictionary.keys()
+            print(dictionary.keys())
         self.decoder = Decoder(config)
         self.handle_record_begin()
         self.stream.start_stream()
@@ -299,7 +299,7 @@ class LocalListener(object):
 
 
     def numbers_config(self, numbers):
-        print ('running number config')
+        print('running number config')
         numbers = numbers or join(dirname(__file__), self.lang,
                                        'numbers.dic')
 
@@ -360,40 +360,40 @@ if __name__ == "__main__":
 
     try:
         local = LocalListener()
-        print "listen async once"
+        print("listen async once")
         local.listen_once_async()
         while True:
             sleep(1)       
             if local.lastutt:
-                print local.lastutt
+                print(local.lastutt)
                 break           
 
 
     except Exception as e:
-        print e
+        print(e)
 
 
     try:
         local = LocalListener()
-        print "listen once"
-        print local.listen_once()
+        print("listen once")
+        print(local.listen_once())
 
     except Exception as e:
-        print e
+        print(e)
 
 
     try:
         local = LocalListener()
-        print "listen for numbers once / ONLY 1, 2, 3 exist in le file! so use these! "
-        print local.listen_numbers_once()
+        print("listen for numbers once / ONLY 1, 2, 3 exist in le file! so use these! ")
+        print(local.listen_numbers_once())
 
     except Exception as e:
-        print e
+        print(e)
 
 
     try:
         local = LocalListener()
-        print "listen async continuous for 10 seconds"
+        print("listen async continuous for 10 seconds")
         local.listen_async()
         while True:
             sleep(10)
@@ -401,30 +401,30 @@ if __name__ == "__main__":
             break
             
     except Exception as e:
-        print e
+        print(e)
 
 
     try:
         local = LocalListener()
-        print "listen continuous until QUIT keyword"
+        print("listen continuous until QUIT keyword")
         ut =  local.listen()
         for i in ut:
             print(i)
             if i == "QUIT":
                 local.listening = False
     except Exception as e:
-        print e
+        print(e)
 
 
     try:
         local = LocalListener()
-        print "listen for numbers / ONLY 1, 2, 3 exist in le file! so use these! "
+        print("listen for numbers / ONLY 1, 2, 3 exist in le file! so use these! ")
         i = 0
         for utt in local.listen_numbers():
-            print utt
+            print(utt)
             i += 1
             if i == 3:
                 local.listening = False
 
     except Exception as e:
-        print e
+        print(e)
