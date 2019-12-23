@@ -1,21 +1,14 @@
 # local listener
-[![Donate with Bitcoin](https://en.cryptobadges.io/badge/micro/1QJNhKM8tVv62XSUrST2vnaMXh5ADSyYP8)](https://en.cryptobadges.io/donate/1QJNhKM8tVv62XSUrST2vnaMXh5ADSyYP8)
-[![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://paypal.me/jarbasai)
-<span class="badge-patreon"><a href="https://www.patreon.com/jarbasAI" title="Donate to this project using Patreon"><img src="https://img.shields.io/badge/patreon-donate-yellow.svg" alt="Patreon donate button" /></a></span>
-[![Say Thanks!](https://img.shields.io/badge/Say%20Thanks-!-1EAEDB.svg)](https://saythanks.io/to/JarbasAl)
 
 pocketsphinx local listener with limited vocab for use inside skills in mycroft-core
 
-
+NOTE: readme outdated, will cleanup for 0.1.0 release
 
 # install
 
-    - git clone repo_url
-    - TODO setup.py
-or
-
-    pip install TODO
-
+```bash
+pip install git+https://github.com/JarbasAl/local_listener
+```
 
 # usage
 
@@ -160,8 +153,3 @@ any language should be supported if you provide the models, english and spanish 
 - JarbasAI
 
 - Adapted from [tjoen](https://github.com/tjoen/local-stt-test)
-
-# liked this and want more?
-
-- https://www.patreon.com/jarbasAI
-- https://www.paypal.me/jarbasAI
