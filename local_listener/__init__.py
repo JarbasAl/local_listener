@@ -27,10 +27,10 @@ class LocalListener:
         self.lm = lm
         self.vocab_dict = vocab_dict
         self.async_thread_ = None
+        self.decoder = None
         self.config = Decoder.default_config()
         # load wav config
         self.audioconfig = read_mycroft_config()
-        self.reset_decoder()
 
         if not debug:
             ERROR_HANDLER_FUNC = CFUNCTYPE(None, c_char_p, c_int, c_char_p, c_int,
@@ -39,7 +39,7 @@ class LocalListener:
             def py_error_handler(filename, line, function, err, fmt):
                 ignores = [0, 2, 16, 77]
                 if err not in ignores:
-                    print(err, fmt)
+                    LOG.error(err, fmt)
 
             c_error_handler = ERROR_HANDLER_FUNC(py_error_handler)
 
@@ -201,6 +201,7 @@ class LocalListener:
                 if word not in vocab_dict.keys():
                     # TODO lang support
                     pho = get_phonemes(word)
+                    LOG.debug("guessing phonemes for {word}: {phonemes}".format(word=word, phonemes=pho))
                     vocab_dict[word] = pho
         if vocab_dict is not None:
             LOG.info("loading custom dictionary")
