@@ -11,7 +11,6 @@ from jarbas_utils.log import LOG
 from jarbas_utils.configuration import read_mycroft_config
 from jarbas_utils.sound import play_wav
 from jarbas_utils import resolve_resource_file
-from time import sleep
 
 
 class LocalListener:
@@ -22,7 +21,7 @@ class LocalListener:
         self.bus = bus or get_mycroft_bus()
         self.event_thread = None
         self.async_thread = None
-        self._lastutt = None
+        self._last_utterance = None
         self.hmm = hmm
         self.lm = lm
         self.vocab_dict = vocab_dict
@@ -54,16 +53,16 @@ class LocalListener:
                 self.p = pyaudio.PyAudio()
         else:
             self.p = pyaudio.PyAudio()
-        # TODO read from config
+        # TODO read params from config
         self.stream = self.p.open(format=pyaudio.paInt16, channels=1,
                                   rate=16000,
                                   input=True, frames_per_buffer=1024)
 
-    def emit(self, message, data=None, context=None):
+    def emit(self, message_type, data=None, context=None):
         if self.bus is not None:
             data = data or {}
             context = context or {"source": "LocalListener"}
-            self.bus.emit(Message(message, data, context))
+            self.bus.emit(Message(message_type, data, context))
 
     def handle_record_begin(self):
         # If enabled, play a wave file with a short sound to audibly
@@ -86,7 +85,7 @@ class LocalListener:
         self.emit("recognizer_loop:wake_up")
 
     def reset_decoder(self, hmm=None, lm=None, vocab_dict=None):
-        self._lastutt = None
+        self._last_utterance = None
         hmm = hmm or self.hmm
         lm = lm or self.lm
         vocab_dict = vocab_dict or self.vocab_dict
@@ -142,7 +141,7 @@ class LocalListener:
                         self.decoder.start_utt()
                         if utt.strip() != '':
                             reply = utt.strip()
-                            self._lastutt = reply
+                            self._last_utterance = reply
                             yield reply
             else:
                 break
@@ -173,7 +172,7 @@ class LocalListener:
                         if utt.strip() != '':
                             reply = utt.strip()
                             yield reply
-                            self._lastutt = reply
+                            self._last_utterance = reply
                             self.listening = False
             else:
                 break
@@ -181,13 +180,13 @@ class LocalListener:
 
     def listen_numbers(self, configpath=None):
         LOG.info("listening for numbers")
-        for number in self.listen_specialized(config=self.numbers_config(
+        for number in self.listen_specialized(config=self.get_numbers_config(
                 configpath)):
             yield number
 
     def listen_numbers_once(self, configpath=None):
         LOG.info("listening for numbers once")
-        return self.listen_once_specialized(config=self.numbers_config(configpath))
+        return self.listen_once_specialized(config=self.get_numbers_config(configpath))
 
     def listen_specialized(self, vocab_dict=None, config=None):
         self.reset_decoder()
@@ -217,7 +216,7 @@ class LocalListener:
                         self.decoder.start_utt()
                         if utt.strip() != '':
                             reply = utt.strip()
-                            self._lastutt = reply
+                            self._last_utterance = reply
                             yield reply
             else:
                 break
@@ -256,7 +255,7 @@ class LocalListener:
                         if utt.strip() != '':
                             reply = utt.strip()
                             yield reply
-                            self._lastutt = reply
+                            self._last_utterance = reply
                             self.listening = False
 
             else:
@@ -272,27 +271,29 @@ class LocalListener:
             return True
         return False
 
-    def numbers_config(self, numbers):
+    def get_numbers_config(self, numbers=None):
         LOG.info('running number config')
-        numbers = numbers or join(dirname(__file__), self.lang, 'numbers.dic')
-
         if not exists(numbers):
             if self.lang.startswith("en"):
-                numbers = self.create_dict({"ONE": "W AH N", "TWO": "T UW",
+                numbers = self.create_dict({"ONE": "W AH N",
+                                            "TWO": "T UW",
                                             "THREE": "TH R IY",
                                             "FOUR": "F AO R",
                                             "FIVE": "F AY V",
                                             "SIX": "S IH K S",
                                             "SEVEN": "S EH V AH N",
-                                            "EIGHT": "EY T", "NINE": "N AY N",
+                                            "EIGHT": "EY T",
+                                            "NINE": "N AY N",
                                             "TEN": "T EH N"})
             else:
+                # TODO other languages
                 raise NotImplementedError
         config = self.config
         config.set_string('-dict', numbers)
         return config
 
-    def create_dict(self, phonemes_dict):
+    @staticmethod
+    def create_dict(phonemes_dict):
         (fd, file_name) = tempfile.mkstemp()
         with fdopen(fd, 'w') as f:
             for key_phrase in phonemes_dict:
@@ -322,70 +323,3 @@ class LocalListener:
         self.stream = None
         if self.p:
             self.p.terminate()
-
-
-if __name__ == "__main__":
-
-    try:
-        local = LocalListener()
-        print("listen async once")
-        local.listen_once_async()
-        while True:
-            sleep(1)
-            if local._lastutt:
-                print(local._lastutt)
-                break
-    except Exception as e:
-        print(e)
-
-    try:
-        local = LocalListener()
-        print("listen once")
-        print(local.listen_once())
-
-    except Exception as e:
-        print(e)
-
-    try:
-        local = LocalListener()
-        print("listen for numbers once / ONLY 1, 2, 3 exist in le file! so use these! ")
-        print(local.listen_numbers_once())
-
-    except Exception as e:
-        print(e)
-
-    try:
-        local = LocalListener()
-        print("listen async continuous for 10 seconds")
-        local.listen_async()
-        while True:
-            sleep(10)
-            local.stop_listening()
-            break
-
-    except Exception as e:
-        print(e)
-
-    try:
-        local = LocalListener()
-        print("listen continuous until QUIT keyword")
-        ut = local.listen()
-        for i in ut:
-            print(i)
-            if i == "QUIT":
-                local.listening = False
-    except Exception as e:
-        print(e)
-
-    try:
-        local = LocalListener()
-        print("listen for numbers / ONLY 1, 2, 3 exist in le file! so use these! ")
-        i = 0
-        for utt in local.listen_numbers():
-            print(utt)
-            i += 1
-            if i == 3:
-                local.listening = False
-
-    except Exception as e:
-        print(e)

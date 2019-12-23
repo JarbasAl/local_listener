@@ -8,7 +8,7 @@ local = LocalListener(hmm=join(lang_model, "hmm"),
                       vocab_dict=join(lang_model, "basic.dic"))
 i = 0
 for utterance in local.listen():
-    print (utterance)
+    print(utterance)
     i += 1
     if i == 5:
         local.listening = False
